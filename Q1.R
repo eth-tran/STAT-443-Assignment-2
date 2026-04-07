@@ -10,10 +10,11 @@
 
 sales.data <- read.csv("StartupSales.csv", header=FALSE)
 sales <- sales.data$V1
+sales.ts <- ts(sales, start = 1, frequency = 4)
 par(mfrow = c(1, 2))
 plot(sales, main = "Company Sales", ylab = "Sales", xlab = "Quarter", pch = 16,
      col = adjustcolor("black", 0.9))
-acf(sales.data$V1, main = "ACF of sales")
+acf(sales.ts, main = "ACF of sales")
 
 # The data is not stationary because there is a clear quadratic trend in the plot 
 # and a slow linear decay in the ACF plot
@@ -29,23 +30,58 @@ acf(sales.data$V1, main = "ACF of sales")
 
 n <- length(sales)
 train <- sales[1:(n - 8)]
+train.ts <- ts(train, start = 1, frequency = 4)
 test <- sales[(n - 7):n]
+test.ts <- ts(test, start = c(24, 4), frequency = 4)
 
 # Simple exponential smoothing
-es <- HoltWinters(train, gamma = FALSE, beta = FALSE)
+es <- HoltWinters(train.ts, gamma = FALSE, beta = FALSE)
 es
 es.predict <- predict(es, n.ahead = 8)
 es.predict
-apse.es <- mean((test - es.predict)^2)
+apse.es <- mean((test.ts - es.predict)^2)
 
 # Double exponential smoothing
-hw <- HoltWinters(train, gamma = FALSE)
+hw <- HoltWinters(train.ts, gamma = FALSE)
 hw
 hw.predict <- predict(hw, n.ahead = 8)
 hw.predict
-apse.hw <- mean((test - hw.predict)^2)
+apse.hw <- mean((test.ts - hw.predict)^2)
 
-apse.es
-apse.hw
-min(apse.es, apse.hw)
-# Double exponential smoothing performs best
+# Triple exponential smoothing (additive)
+hw.additive <- HoltWinters(train.ts, seasonal = "additive")
+hw.additive
+hw.additive.predict <- predict(hw.additive, n.ahead = 8)
+hw.additive.predict
+apse.hw.additive <- mean((test.ts - hw.additive.predict)^2)
+
+# Triple exponential smoothing (multiplicative)
+hw.multiplicative <- HoltWinters(train.ts, seasonal = "multiplicative")
+hw.multiplicative
+hw.multiplicative.predict <- predict(hw.multiplicative, n.ahead = 8)
+hw.multiplicative.predict
+apse.hw.multiplicative <- mean((test.ts - hw.multiplicative.predict)^2)
+
+# Lowest APSE
+apse <- c(apse.es, apse.hw, apse.hw.additive, apse.hw.multiplicative)
+which.min(apse)
+# Triple exponential smoothing (additive) performs best
+
+
+# c.
+
+fitted.model <- HoltWinters(sales.ts, seasonal = "additive")
+pred.fitted <- predict(fitted.model, n.ahead = 12, prediction.interval = TRUE, level = 0.95)
+plot(fitted.model, pred.fitted, main = "Triple Exponential Smoothing (Additive)")
+pred.fitted
+
+
+# d.
+par(mfrow = c(1, 3))
+hist(residuals(fitted.model), main = "Histogram of Residuals", xlab = "Residuals")
+qqnorm(residuals(fitted.model))
+qqline(residuals(fitted.model))
+acf(residuals(fitted.model), main = "ACF of Fitted Model")
+# The residuals appear to be normal based on the Q-Q plot, histogram, and the 
+# ACF plot, so Gaussian white noise is a reasonable assumption.
+
